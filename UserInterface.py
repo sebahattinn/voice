@@ -44,6 +44,9 @@ class AudioRecorder:
         self.process_button = tk.Button(button_frame, text="Kayıdı İşle", command=self.process_recording, **button_style)
         self.process_button.pack(side=tk.LEFT, padx=5, pady=10)
 
+        self.exit_button = tk.Button(button_frame, text="Çıkış", command=self.close_program, **button_style)  # Çıkış butonu
+        self.exit_button.pack(side=tk.LEFT, padx=5, pady=10)
+
         self.custom_font = font.Font(family="Times New Roman", size=15, weight="normal")
 
         self.signal_plot = plt.figure(figsize=(6, 3))
@@ -63,15 +66,18 @@ class AudioRecorder:
         self.info_text.tag_configure("content", font=("Arial", 12, "normal"), foreground="#000000")
 
         # Eğitilmiş modeli yükleme
-        model_kayit_yolu = 'model-fatih-müyesser-sümeyye.pkl'
+        model_kayit_yolu = r'C:\Users\sebah\voice\Data\Model.pkl'
         self.model = joblib.load(model_kayit_yolu)
 
-        self.sinif_isimleri = ['Fatih','Sümeyye','Müyesser']
+        self.sinif_isimleri = ['Sebahattin Tegi', 'Hüseyin Tasgeldi', 'Eren Öztürk', 'Arda Yemci']
 
         # Mikrofondan ses almak için gerekli parametreler
         self.saniye_basina_ornek = 44100  # Örnekleme hızı (örneğin, 44100 Hz)
         self.saniye = 5  # 5 saniyelik ses al
         self.kanal_sayisi = 1  # Tek kanallı ses
+
+        # Yabancı kişi tanımlama
+        self.known_speakers = set(self.sinif_isimleri)  # Bilinen konuşmacıların kümesi
 
     def start_recording(self):
         if not self.is_recording:
@@ -154,23 +160,21 @@ class AudioRecorder:
             
         kelimeler.extend(transcript.split())
             
-        #print("Transcript:")
-        #print(transcript)
-            
-        #print("Kelime Sayısı:")
-        #print(len(kelimeler))
-            
         return transcript, len(kelimeler)
         
     def speaker_identification(self, file):
         # Ses dosyasını yükleme ve MFCC özelliklerini çıkarma
         y, sr = librosa.load(file, sr=self.saniye_basina_ornek)
-        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=128)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
         mfcc = np.mean(mfcc.T, axis=0)  # Ortalama MFCC vektörü
         
         # Model üzerinden tahmin yapma
         tahmin_indeksi = self.model.predict(mfcc.reshape(1, -1))[0]
         tahmin_isim = self.sinif_isimleri[tahmin_indeksi]
+
+        # Yabancı kişi kontrolü
+        if tahmin_isim not in self.known_speakers:
+            return "Yabancı"  # Eğer kişi bilinen konuşmacılar arasında değilse "Yabancı" döndür
         
         return tahmin_isim
     
@@ -191,8 +195,17 @@ class AudioRecorder:
         self.ax.set_xlabel('Zaman (s)')
         self.ax.set_ylabel('Amplitüd')
         self.canvas.draw()
-        
-        
+
+    def close_program(self):
+        # Kayıt yapılıyorsa durdur
+        if self.is_recording:
+            self.stop_recording()
+
+        # Çıkış için tkinter penceresini kapatma
+        self.root.quit()  # Tkinter uygulamasını düzgün bir şekilde sonlandırır.
+        self.root.destroy()  # Tkinter penceresini kapatır.
+
+
 if __name__ == "__main__":
     root = tk.Tk()
     root.geometry("1200x700")
